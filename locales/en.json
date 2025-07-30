@@ -1,0 +1,19 @@
+{
+  "camera": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "retake": "Retake",
+    "flash_auto": "Auto",
+    "flash_on": "On",
+    "flash_off": "Off",
+    "flip": "Flip Camera",
+    "photo_mode": "Photo",
+    "video_mode": "Video",
+    "start_recording": "Start Recording",
+    "stop_recording": "Stop Recording",
+    "permission_title": "Permission Required",
+    "permission_message": "Camera (and microphone for video) permission is required. Grant now?",
+    "permission_grant": "Grant",
+    "permission_deny": "Cancel"
+  }
+}
