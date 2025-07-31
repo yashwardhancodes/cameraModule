@@ -96,7 +96,7 @@ const videoQualityOptions = [
   },
   {
     label: 'High (1080p)',
-    value: '1080p',
+    value: '1088p',
     description: 'Sharp quality, larger file size',
     icon: '✨',
   },
@@ -155,7 +155,6 @@ const CameraScreen = () => {
     return Date.now() - recordingStartTime >= 1000;
   };
 
-
   useEffect(() => {
     currentModeRef.current = mode;
     isRecordingRef.current = isRecording;
@@ -171,6 +170,7 @@ const CameraScreen = () => {
     }
 
     return () => {
+      console.log('Cleaning up recording interval');
       if (interval) clearInterval(interval);
     };
   }, [isRecording]);
@@ -185,6 +185,7 @@ const CameraScreen = () => {
     }
 
     return () => {
+      console.log('Cleaning up on mode change');
       if (isRecordingRef.current) {
         handleStopRecording(true);
       }
@@ -233,7 +234,10 @@ const CameraScreen = () => {
   };
 
   const handleStopRecording = async (discard: boolean = false) => {
-    if (!cameraRef.current || !isRecordingRef.current) return;
+    if (!cameraRef.current || !isRecordingRef.current) {
+      console.log('No camera ref or not recording, skipping stop recording');
+      return;
+    }
 
     try {
       await cameraRef.current.stopRecording();
@@ -245,102 +249,107 @@ const CameraScreen = () => {
     }
   };
 
- const handleShutter = async () => {
-  setIsCameraLoading(true);
+  const handleShutter = async () => {
+    setIsCameraLoading(true);
 
-  if (!cameraRef.current) {
-    setIsCameraLoading(false);
-    return;
-  }
-
-  await Haptics.selectionAsync();
-
-  if (currentModeRef.current === 'photo') {
-    // PHOTO MODE
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 1,
-        skipProcessing: true,
-      });
-
-      if (photo) {
-        setLoading(true); // separate from camera loading
-        const savedPath = await compressAndSaveImage(photo.uri, quality, maxSizePx);
-        setPreviewUri(savedPath);
-        setPreviewType('photo');
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Photo capture error:', error);
-      setLoading(false);
-    } finally {
+    if (!cameraRef.current) {
       setIsCameraLoading(false);
-    }
-  } else {
-    // VIDEO MODE
-
-    if (!micPermission?.granted) {
-      await requestMicPermission();
-      setIsCameraLoading(false);
+      console.log('No camera ref, exiting handleShutter');
       return;
     }
 
-    if (isRecordingRef.current) {
-      // STOP recording — but check if 1 second has passed
-      const now = Date.now();
-      if (recordingStartTime && now - recordingStartTime < 1000) {
-         setIsCameraLoading(false);
+    await Haptics.selectionAsync();
+
+    if (currentModeRef.current === 'photo') {
+      // PHOTO MODE
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 1,
+          skipProcessing: true,
+        });
+
+        if (photo) {
+          setLoading(true); // separate from camera loading
+          const savedPath = await compressAndSaveImage(photo.uri, quality, maxSizePx);
+          setPreviewUri(savedPath);
+          setPreviewType('photo');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Photo capture error:', error);
+        setLoading(false);
+      } finally {
+        setIsCameraLoading(false);
+      }
+    } else {
+      // VIDEO MODE
+
+      if (!micPermission?.granted) {
+        await requestMicPermission();
+        setIsCameraLoading(false);
+        console.log('Microphone permission not granted, exiting handleShutter');
         return;
       }
 
-      await handleStopRecording(); // Your logic to stop recording
-      setIsCameraLoading(false);
-      return;
-    }
-
-    // START recording
-    try {
-      const { sound } = await Audio.Sound.createAsync(require('../../assets/shutter.mp3'));
-      await sound.playAsync();
-      sound.unloadAsync();
-    } catch (error) {
-      console.warn('Failed to play shutter sound:', error);
-    }
-
-    setRecordingStartTime(Date.now());
-    setIsRecording(true);
-    isRecordingRef.current = true;
-    setRecordingTime(0);
-
-    try {
-      const video = await cameraRef.current.recordAsync({ quality: videoPreset });
-
-      if (currentModeRef.current === 'video' && video) {
-        const savedUri = await saveVideoToGallery(video.uri);
-        const finalUri = savedUri.startsWith('file://') ? savedUri : `file://${savedUri}`;
-        setPreviewUri(finalUri);
-        setPreviewType('video');
-      } else if (video?.uri) {
-        try {
-          await FileSystem.deleteAsync(video.uri);
-        } catch (error) {
-          console.warn('Failed to delete temp video:', error);
+      if (isRecordingRef.current) {
+        // STOP recording — but check if 1 second has passed
+        const now = Date.now();
+        if (recordingStartTime && now - recordingStartTime < 1000) {
+          setIsCameraLoading(false);
+          console.log('Recording too short, exiting handleShutter');
+          return;
         }
+
+        await handleStopRecording(); // Your logic to stop recording
+        setIsCameraLoading(false);
+        console.log('Stopped recording');
+        return;
       }
-    } catch (error) {
-      console.error('Video record error:', error);
-    } finally {
-      setIsRecording(false);
-      isRecordingRef.current = false;
-      setIsCameraLoading(false);
+
+      // START recording
+      try {
+        const { sound } = await Audio.Sound.createAsync(require('../../assets/shutter.mp3'));
+        await sound.playAsync();
+        sound.unloadAsync();
+      } catch (error) {
+        console.warn('Failed to play shutter sound:', error);
+      }
+
+      setRecordingStartTime(Date.now());
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setRecordingTime(0);
+
+      try {
+        const video = await cameraRef.current.recordAsync({ quality: videoPreset });
+
+        if (currentModeRef.current === 'video' && video) {
+          const savedUri = await saveVideoToGallery(video.uri);
+          const finalUri = savedUri.startsWith('file://') ? savedUri : `file://${savedUri}`;
+          setPreviewUri(finalUri);
+          setPreviewType('video');
+        } else if (video?.uri) {
+          try {
+            await FileSystem.deleteAsync(video.uri);
+          } catch (error) {
+            console.warn('Failed to delete temp video:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Video record error:', error);
+      } finally {
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        setIsCameraLoading(false);
+      }
     }
-  }
-};
-
-
+  };
 
   const handleConfirm = async () => {
-    if (!previewUri || !previewType) return;
+    if (!previewUri || !previewType) {
+      console.log('No preview URI or type, exiting handleConfirm');
+      return;
+    }
 
     try {
       const fileSize = await getFileSize(previewUri);
@@ -364,8 +373,27 @@ const CameraScreen = () => {
     setRecordingTime(0);
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    console.log('Formatting time:', seconds);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const getFlashIcon = () => {
+    console.log('Getting flash icon for flash mode:', flash);
+    switch (flash) {
+      case 'on':
+        return <Zap size={24} color="white" />;
+      case 'auto':
+        return <Sun size={24} color="white" />;
+      default:
+        return <ZapOff size={24} color="white" />;
+    }
+  };
 
   if (loading) {
+    console.log('Rendering loading screen');
     return (
       <LinearGradient
         colors={['#000', '#1a1a1a']}
@@ -384,20 +412,41 @@ const CameraScreen = () => {
     );
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+  if (!permission?.granted) {
+    console.log('Rendering permission screen');
+    return (
+      <View style={styles.permissionContainer}>
+        <View style={styles.permissionContent}>
+          <Camera size={48} color="white" style={styles.permissionIcon} />
+          <Text style={styles.permissionTitle}>
+            {t('camera.permissionTitle') || 'Camera Access Required'}
+          </Text>
+          <Text style={styles.permissionMessage}>
+            {t('camera.permissionMessage') ||
+              'This app needs camera access to take photos and videos. Please enable it in settings.'}
+          </Text>
+          <TouchableOpacity
+            onPress={requestPermission}
+            style={styles.permissionButton}
+          >
+            <Text style={styles.permissionButtonText}>
+              {t('camera.grantPermission') || 'Grant Permission'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>
+              {t('camera.back') || 'Go Back'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
-  const getFlashIcon = () => {
-    switch (flash) {
-      case 'on': return <Zap size={24} color="white" />;
-      case 'auto': return <Sun size={24} color="white" />;
-      default: return <ZapOff size={24} color="white" />;
-    }
-  };
-
+  console.log('Rendering main camera screen');
   return (
     <View style={styles.container} ref={containerRef}>
       {!previewUri ? (
@@ -414,7 +463,7 @@ const CameraScreen = () => {
             onPress={handleFocus}
             onLayout={(event) => {
               const { width, height } = event.nativeEvent.layout;
-             }}
+            }}
           >
             <CameraView
               ref={cameraRef}
@@ -426,10 +475,8 @@ const CameraScreen = () => {
               videoQuality={videoPreset}
               onLayout={(event) => {
                 const { width, height } = event.nativeEvent.layout;
-               }}
+              }}
             />
-
-
 
             {/* COMPLETELY REPLACED FOCUS INDICATOR - NO ANIMATIONS */}
             {focusPoint && showFocus && (
@@ -492,10 +539,12 @@ const CameraScreen = () => {
 
                 <ScrollView style={styles.qualityList} showsVerticalScrollIndicator={false}>
                   {(mode === 'photo' ? imageQualityOptions : videoQualityOptions).map((option) => {
-                    const isSelected = mode === 'photo'
-                      ? selectedQuality.value === option.value
-                      : selectedVideoQuality.value === option.value;
+                    const isSelected =
+                      mode === 'photo'
+                        ? selectedQuality.value === option.value
+                        : selectedVideoQuality.value === option.value;
 
+                    console.log(`Rendering quality option: ${option.label}, selected: ${isSelected}`);
                     return (
                       <TouchableOpacity
                         key={option.value}
@@ -511,10 +560,17 @@ const CameraScreen = () => {
                       >
                         <Text style={styles.qualityIcon}>{option.icon}</Text>
                         <View style={styles.qualityText}>
-                          <Text style={[styles.qualityLabel, isSelected && styles.qualityLabelSelected]}>
+                          <Text
+                            style={[styles.qualityLabel, isSelected && styles.qualityLabelSelected]}
+                          >
                             {option.label}
                           </Text>
-                          <Text style={[styles.qualityDescription, isSelected && styles.qualityDescriptionSelected]}>
+                          <Text
+                            style={[
+                              styles.qualityDescription,
+                              isSelected && styles.qualityDescriptionSelected,
+                            ]}
+                          >
                             {option.description}
                           </Text>
                         </View>
@@ -554,7 +610,6 @@ const CameraScreen = () => {
                 </TouchableOpacity>
 
                 {/* Main shutter button */}
-
                 <TouchableOpacity
                   onPress={handleShutter}
                   disabled={
@@ -565,14 +620,11 @@ const CameraScreen = () => {
                     styles.shutterButton,
                     isRecording && styles.shutterButtonRecording,
                     ((isCameraLoading && mode === 'photo') ||
-                      (mode === 'video' && isRecording && !canStopRecording())) && { opacity: 0.5 }
+                      (mode === 'video' && isRecording && !canStopRecording())) && { opacity: 0.5 },
                   ]}
                 >
                   <View
-                    style={[
-                      styles.shutterInner,
-                      isRecording && styles.shutterInnerRecording
-                    ]}
+                    style={[styles.shutterInner, isRecording && styles.shutterInnerRecording]}
                   >
                     {isCameraLoading && mode === 'photo' ? (
                       <Loader size={28} color="white" />
@@ -585,8 +637,6 @@ const CameraScreen = () => {
                     )}
                   </View>
                 </TouchableOpacity>
-
-
 
                 {/* Settings */}
                 <View style={styles.settingsColumn}>
