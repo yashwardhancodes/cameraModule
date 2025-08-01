@@ -1,4 +1,4 @@
-import { Audio, Video } from 'expo-av';
+import Audio from 'expo-audio';
 import { BlurView } from 'expo-blur';
 import {
   CameraType,
@@ -11,6 +11,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Video from 'expo-video';
 import {
   Camera,
   Check,
@@ -272,7 +273,7 @@ const CameraScreen = () => {
           setLoading(false);
         }
       } catch (error) {
-        console.error('Photo capture error:');
+        console.error('Photo capture error:',error);
         setLoading(false);
       } finally {
         setIsCameraLoading(false);
