@@ -186,7 +186,7 @@ const CameraScreen = () => {
 
     return () => {
       console.log('Cleaning up on mode change');
-      if (isRecordingRef.current) {
+       if (isRecordingRef.current) {
         handleStopRecording(true);
       }
     };
@@ -196,27 +196,22 @@ const CameraScreen = () => {
     const { nativeEvent } = event;
     const { locationX, locationY, pageX, pageY } = nativeEvent;
 
-    // Use locationX and locationY for more accurate positioning
-    let x = locationX;
+     let x = locationX;
     let y = locationY;
 
-    // If locationX/locationY are not available, fall back to pageX/pageY
-    if (x === undefined || y === undefined) {
+     if (x === undefined || y === undefined) {
       x = pageX;
       y = pageY;
     }
 
-    // Ensure the focus point is within bounds
-    const clampedX = Math.max(50, Math.min(screenWidth - 50, x));
+     const clampedX = Math.max(50, Math.min(screenWidth - 50, x));
     const clampedY = Math.max(50, Math.min(screenHeight - 50, y));
 
     setFocusPoint({ x: clampedX, y: clampedY });
 
-    // Haptic feedback for better UX
-    Haptics.selectionAsync();
+     Haptics.selectionAsync();
 
-    // COMPLETELY REPLACED: Simple timeout-based focus indicator
-    setShowFocus(true);
+     setShowFocus(true);
     setTimeout(() => {
       setShowFocus(false);
       setFocusPoint(null);
@@ -251,7 +246,7 @@ const CameraScreen = () => {
 
   const handleShutter = async () => {
     setIsCameraLoading(true);
-
+ 
     if (!cameraRef.current) {
       setIsCameraLoading(false);
       console.log('No camera ref, exiting handleShutter');
@@ -262,6 +257,7 @@ const CameraScreen = () => {
 
     if (currentModeRef.current === 'photo') {
       // PHOTO MODE
+      console.log("cameraRef.current:", cameraRef.current);
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 1,
@@ -276,7 +272,7 @@ const CameraScreen = () => {
           setLoading(false);
         }
       } catch (error) {
-        console.error('Photo capture error:', error);
+        console.error('Photo capture error:');
         setLoading(false);
       } finally {
         setIsCameraLoading(false);
@@ -381,8 +377,7 @@ const CameraScreen = () => {
   };
 
   const getFlashIcon = () => {
-    console.log('Getting flash icon for flash mode:', flash);
-    switch (flash) {
+     switch (flash) {
       case 'on':
         return <Zap size={24} color="white" />;
       case 'auto':
@@ -392,29 +387,28 @@ const CameraScreen = () => {
     }
   };
 
-  if (loading) {
-    console.log('Rendering loading screen');
-    return (
-      <LinearGradient
-        colors={['#000', '#1a1a1a']}
-        style={styles.loadingContainer}
-      >
-        <View style={styles.loadingContent}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>
-            {currentModeRef.current === 'photo' ? 'Processing photo...' : 'Processing video...'}
-          </Text>
-          <View style={styles.loadingProgress}>
-            <View style={styles.loadingBar} />
-          </View>
-        </View>
-      </LinearGradient>
-    );
-  }
+  // if (loading) {
+  //   console.log('Rendering loading screen');
+  //   return (
+  //     <LinearGradient
+  //       colors={['#000', '#1a1a1a']}
+  //       style={styles.loadingContainer}
+  //     >
+  //       <View style={styles.loadingContent}>
+  //         <ActivityIndicator size="large" color="#007AFF" />
+  //         <Text style={styles.loadingText}>
+  //           {currentModeRef.current === 'photo' ? 'Processing photo...' : 'Processing video...'}
+  //         </Text>
+  //         <View style={styles.loadingProgress}>
+  //           <View style={styles.loadingBar} />
+  //         </View>
+  //       </View>
+  //     </LinearGradient>
+  //   );
+  // }
 
   if (!permission?.granted) {
-    console.log('Rendering permission screen');
-    return (
+     return (
       <View style={styles.permissionContainer}>
         <View style={styles.permissionContent}>
           <Camera size={48} color="white" style={styles.permissionIcon} />
@@ -446,8 +440,7 @@ const CameraScreen = () => {
     );
   }
 
-  console.log('Rendering main camera screen');
-  return (
+   return (
     <View style={styles.container} ref={containerRef}>
       {!previewUri ? (
         <>
@@ -544,8 +537,7 @@ const CameraScreen = () => {
                         ? selectedQuality.value === option.value
                         : selectedVideoQuality.value === option.value;
 
-                    console.log(`Rendering quality option: ${option.label}, selected: ${isSelected}`);
-                    return (
+                     return (
                       <TouchableOpacity
                         key={option.value}
                         onPress={() => {
