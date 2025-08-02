@@ -11,6 +11,7 @@ const CameraEntry = () => {
   console.log('Camera mediaPath1:', path, type, size);
 
   const handleOpenCamera = async () => {
+    console.log('opening camera')
     // Check camera permission first
     if (!permission?.granted) {
       const cameraResult = await requestPermission();
