@@ -1,5 +1,5 @@
-import { Video } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import Video from "expo-video";
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 

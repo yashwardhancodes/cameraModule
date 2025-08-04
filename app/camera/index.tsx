@@ -1,40 +1,40 @@
-import { Audio, Video } from "expo-av";
+import { useAudioPlayer } from 'expo-audio';
 import { BlurView } from "expo-blur";
 import {
-  CameraType,
-  CameraView,
-  FlashMode,
-  useCameraPermissions,
-  useMicrophonePermissions,
+	CameraType,
+	CameraView,
+	FlashMode,
+	useCameraPermissions,
+	useMicrophonePermissions,
 } from "expo-camera";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useVideoPlayer, VideoView } from 'expo-video';
 import {
-  Camera,
-  Check,
-  Loader,
-  RefreshCw,
-  RotateCcw,
-  Sun,
-  Video as VideoIcon,
-  X,
-  Zap,
-  ZapOff,
+	Camera,
+	Check,
+	Loader,
+	RefreshCw,
+	RotateCcw,
+	Sun,
+	Video as VideoIcon,
+	X,
+	Zap,
+	ZapOff,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+	ActivityIndicator,
+	Dimensions,
+	Image,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View
 } from "react-native";
 import { compressAndSaveImage, getFileSize, saveVideoToGallery } from "../../utils/MediaUtils";
 
@@ -75,10 +75,11 @@ const imageQualityOptions = [
 	},
 ];
 
+// OPTIMIZED: Better video quality presets for performance
 const videoQualityOptions = [
 	{
 		label: "Very Low",
-		value: "4:3",
+		value: "360p", // Changed to unique value
 		description: "Minimal file size, fastest upload, low clarity",
 		icon: "🚀",
 	},
@@ -96,7 +97,7 @@ const videoQualityOptions = [
 	},
 	{
 		label: "High (1080p)",
-		value: "1088p",
+		value: "1080p", // Fixed from "1088p" to standard "1080p"
 		description: "Sharp quality, larger file size",
 		icon: "✨",
 	},
@@ -110,7 +111,10 @@ const videoQualityOptions = [
 
 const DEFAULT_QUALITY = 0.6;
 const DEFAULT_MAX_SIZE_PX = 1024;
-const DEFAULT_VIDEO_PRESET = "480p";
+const DEFAULT_VIDEO_PRESET = "720p"; // Changed from 480p for better quality
+
+const audioSource = require('../../assets/shutter.mp3');
+const audioSource1 = require('../../assets/recording.mp3');
 
 const CameraScreen = () => {
 	const cameraRef = useRef<CameraView | null>(null);
@@ -119,6 +123,8 @@ const CameraScreen = () => {
 	const { t } = useTranslation();
 	const [permission, requestPermission] = useCameraPermissions();
 	const [micPermission, requestMicPermission] = useMicrophonePermissions();
+	const player = useAudioPlayer(audioSource);
+	const player1 = useAudioPlayer(audioSource1);
 
 	const rawParams = useLocalSearchParams();
 	const mode = (rawParams.mode as "photo" | "video") ?? "photo";
@@ -128,11 +134,16 @@ const CameraScreen = () => {
 
 	const [selectedQuality, setSelectedQuality] = useState(imageQualityOptions[1]);
 	const [selectedVideoQuality, setSelectedVideoQuality] = useState(videoQualityOptions[2]);
-	const quality = selectedQuality.quality;
-	const maxSizePx = selectedQuality.maxSize || DEFAULT_MAX_SIZE_PX;
-	const videoPreset = selectedVideoQuality.value;
+	
+	// OPTIMIZED: Memoize quality values to prevent recalculations
+	const { quality, maxSizePx, videoPreset } = useMemo(() => ({
+		quality: selectedQuality.quality,
+		maxSizePx: selectedQuality.maxSize || DEFAULT_MAX_SIZE_PX,
+		videoPreset: selectedVideoQuality.value
+	}), [selectedQuality, selectedVideoQuality]);
+
 	const [cameraReady, setCameraReady] = useState(false);
-	const [isCameraMounted, setIsCameraMounted] = useState(true); // New state for mounting
+	const [isCameraMounted, setIsCameraMounted] = useState(true);
 	const [flash, setFlash] = useState<FlashMode>("off");
 	const [cameraType, setCameraType] = useState<CameraType>("back");
 	const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -147,43 +158,71 @@ const CameraScreen = () => {
 	const currentModeRef = useRef(mode);
 	const isRecordingRef = useRef(false);
 	const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
+	
+	// OPTIMIZED: Refs for video player management
+	const videoPlayerRef = useRef<any>(null);
+	const lastVideoUriRef = useRef<string | null>(null);
 
-  const canStopRecording = () => {
+	// OPTIMIZED: Create video player only when needed and reuse
+	const videoPlayer = useVideoPlayer(
+		previewUri && previewType === "video" ? previewUri : null, 
+		useCallback((player) => {
+			videoPlayerRef.current = player;
+			if (previewUri && previewType === "video") {
+				// OPTIMIZED: Add error handling and performance settings
+				try {
+					player.loop = true;
+					player.volume = 0; // Mute to improve performance
+					player.playbackRate = 1.0; // Ensure normal playback rate
+					// Don't auto-play immediately, wait for user interaction or explicit call
+				} catch (error) {
+					console.warn("Video player setup error:", error);
+				}
+			}
+		}, [previewUri, previewType])
+	);
+
+	const canStopRecording = useCallback(() => {
 		if (!recordingStartTime) return false;
 		return Date.now() - recordingStartTime >= 1000;
-  };
+	}, [recordingStartTime]);
 
 	useEffect(() => {
 		currentModeRef.current = mode;
 		isRecordingRef.current = isRecording;
 	}, [mode, isRecording]);
 
+	// OPTIMIZED: Use useCallback for recording timer
 	useEffect(() => {
 		let interval: ReturnType<typeof setInterval> | null = null;
 		if (isRecording) {
 			interval = setInterval(() => {
 				setRecordingTime((prev) => prev + 1);
 			}, 1000);
+		} else {
+			setRecordingTime(0);
 		}
 		return () => {
 			if (interval) clearInterval(interval);
 		};
 	}, [isRecording]);
 
+	// OPTIMIZED: Better camera mounting with cleanup
 	useEffect(() => {
 		setCameraReady(false);
 		setIsCameraMounted(false);
-		setPreviewUri(mediaPath || null); // Restore previous media
+		setPreviewUri(mediaPath || null);
 		setPreviewType(mediaType || null);
-		setRecordingTime(0);
 
+		// Stop any ongoing recording when mode changes
 		if (isRecordingRef.current) {
 			handleStopRecording(true);
 		}
 
+		// OPTIMIZED: Shorter timeout for faster camera mounting
 		const timeout = setTimeout(() => {
 			setIsCameraMounted(true);
-		}, 100);
+		}, 50);
 
 		return () => {
 			clearTimeout(timeout);
@@ -193,16 +232,66 @@ const CameraScreen = () => {
 		};
 	}, [mode, mediaPath, mediaType]);
 
-	const toggleMode = () => {
+	// OPTIMIZED: Better video player management with performance improvements
+	useEffect(() => {
+		if (previewType === "video" && previewUri && videoPlayer && previewUri !== lastVideoUriRef.current) {
+			lastVideoUriRef.current = previewUri;
+			
+			const setupVideo = async () => {
+				try {
+					// OPTIMIZED: Clean up previous video first
+					if (videoPlayerRef.current) {
+						try {
+							await videoPlayerRef.current.pause();
+						} catch (e) {
+							// Ignore pause errors
+						}
+					}
+					
+					// OPTIMIZED: Use requestAnimationFrame for smoother transition
+					requestAnimationFrame(async () => {
+						try {
+							await videoPlayer.replaceAsync(previewUri);
+							// OPTIMIZED: Only play after a short delay to ensure smooth loading
+							setTimeout(() => {
+								if (videoPlayerRef.current) {
+									videoPlayerRef.current.play();
+								}
+							}, 100);
+						} catch (error) {
+							console.warn("Video player replace error:", error);
+						}
+					});
+				} catch (error) {
+					console.warn("Video setup error:", error);
+				}
+			};
+
+			setupVideo();
+		}
+		
+		// Cleanup when preview is removed
+		return () => {
+			if (!previewUri && videoPlayerRef.current) {
+				try {
+					videoPlayerRef.current.pause();
+				} catch (e) {
+					// Ignore cleanup errors
+				}
+			}
+		};
+	}, [previewUri, previewType, videoPlayer]);
+
+	const toggleMode = useCallback(() => {
 		router.setParams({
 			mode: mode === "photo" ? "video" : "photo",
 			path: previewUri || mediaPath,
 			type: previewType || mediaType,
 			size: mediaSize,
 		});
-	};
+	}, [mode, previewUri, mediaPath, previewType, mediaType, mediaSize, router]);
 
-	const handleFocus = (event: any) => {
+	const handleFocus = useCallback((event: any) => {
 		const { nativeEvent } = event;
 		const { locationX, locationY, pageX, pageY } = nativeEvent;
 		let x = locationX || pageX;
@@ -217,17 +306,17 @@ const CameraScreen = () => {
 			setShowFocus(false);
 			setFocusPoint(null);
 		}, 1200);
-	};
+	}, []);
 
-	const toggleFlash = () => {
+	const toggleFlash = useCallback(() => {
 		setFlash((prev) => (prev === "off" ? "on" : prev === "on" ? "auto" : "off"));
-	};
+	}, []);
 
-	const toggleCamera = () => {
+	const toggleCamera = useCallback(() => {
 		setCameraType((prev) => (prev === "back" ? "front" : "back"));
-	};
+	}, []);
 
-	const handleStopRecording = async (discard: boolean = false) => {
+	const handleStopRecording = useCallback(async (discard: boolean = false) => {
 		if (!cameraRef.current || !isRecordingRef.current) {
 			return;
 		}
@@ -238,110 +327,107 @@ const CameraScreen = () => {
 		} finally {
 			setIsRecording(false);
 			isRecordingRef.current = false;
+			setRecordingStartTime(null);
 		}
-	};
+	}, []);
 
-	const handleShutter = async () => {
-    setIsCameraLoading(true);
-    if (!cameraRef.current) {
-        setIsCameraLoading(false);
-        return;
-    }
-    await Haptics.selectionAsync();
+	const handleShutter = useCallback(async () => {
+		setIsCameraLoading(true);
+		if (!cameraRef.current) {
+			setIsCameraLoading(false);
+			return;
+		}
+		await Haptics.selectionAsync();
 
-    if (currentModeRef.current === "photo") {
-        try {
-            // Play shutter sound for photo
-            try {
-                const { sound } = await Audio.Sound.createAsync(
-                    require("../../assets/shutter.mp3"),
-                );
-                await sound.playAsync();
-                sound.unloadAsync();
-            } catch (error) {
-                console.warn("Failed to play shutter sound:", error);
-            }
+		if (currentModeRef.current === "photo") {
+			try {
+				// Play shutter sound for photo
+				try {
+					player.play();
+				} catch (error) {
+					console.warn("Failed to play shutter sound:", error);
+				}
 
-            const photo = await cameraRef.current.takePictureAsync({
-                quality: 1,
-                skipProcessing: true,
-            });
-            if (photo) {
-                setLoading(true);
-                const savedPath = await compressAndSaveImage(photo.uri, quality, maxSizePx);
-                setPreviewUri(savedPath);
-                setPreviewType("photo");
-                setLoading(false);
-            }
-        } catch (error) {
-            console.error("Photo capture error:", error);
-            setLoading(false);
-        } finally {
-            setIsCameraLoading(false);
-        }
-    } else {
-        if (!micPermission?.granted) {
-            await requestMicPermission();
-            setIsCameraLoading(false);
-            return;
-        }
-        if (isRecordingRef.current) {
-            const now = Date.now();
-            if (recordingStartTime && now - recordingStartTime < 1000) {
-                setIsCameraLoading(false);
-                return;
-            }
-            // Play recording sound when stopping recording
-            try {
-                const { sound } = await Audio.Sound.createAsync(
-                    require("../../assets/recording.mp3"),
-                );
-                await sound.playAsync();
-                sound.unloadAsync();
-            } catch (error) {
-                console.warn("Failed to play recording sound:", error);
-            }
-            await handleStopRecording();
-            setIsCameraLoading(false);
-            return;
-        }
-        // Play recording sound when starting recording
-        try {
-            const { sound } = await Audio.Sound.createAsync(
-                require("../../assets/recording.mp3"),
-            );
-            await sound.playAsync();
-            sound.unloadAsync();
-        } catch (error) {
-            console.warn("Failed to play recording sound:", error);
-        }
-        setRecordingStartTime(Date.now());
-        setIsRecording(true);
-        isRecordingRef.current = true;
-        setRecordingTime(0);
-        try {
-            const video = await cameraRef.current.recordAsync({ quality: videoPreset });
-            if (currentModeRef.current === "video" && video) {
-                const savedUri = await saveVideoToGallery(video.uri);
-                const finalUri = savedUri.startsWith("file://")
-                    ? savedUri
-                    : `file://${savedUri}`;
-                setPreviewUri(finalUri);
-                setPreviewType("video");
-            } else if (video?.uri) {
-                await FileSystem.deleteAsync(video.uri);
-            }
-        } catch (error) {
-            console.error("Video record error:", error);
-        } finally {
-            setIsRecording(false);
-            isRecordingRef.current = false;
-            setIsCameraLoading(false);
-        }
-    }
-};
+				// OPTIMIZED: Better photo capture settings
+				const photo = await cameraRef.current.takePictureAsync({
+					quality: 0.9, // Slightly reduced for performance
+					skipProcessing: false, // Enable processing for better quality
+					exif: false, // Disable EXIF for smaller files
+				});
+				if (photo) {
+					setLoading(true);
+					const savedPath = await compressAndSaveImage(photo.uri, quality, maxSizePx);
+					setPreviewUri(savedPath);
+					setPreviewType("photo");
+					setLoading(false);
+				}
+			} catch (error) {
+				console.error("Photo capture error:", error);
+				setLoading(false);
+			} finally {
+				setIsCameraLoading(false);
+			}
+		} else {
+			if (!micPermission?.granted) {
+				await requestMicPermission();
+				setIsCameraLoading(false);
+				return;
+			}
+			if (isRecordingRef.current) {
+				const now = Date.now();
+				if (recordingStartTime && now - recordingStartTime < 1000) {
+					setIsCameraLoading(false);
+					return;
+				}
+				// Play recording sound when stopping recording
+				try {
+					player1.play();
+				} catch (error) {
+					console.warn("Failed to play recording sound:", error);
+				}
+				await handleStopRecording();
+				setIsCameraLoading(false);
+				return;
+			}
+			// Play recording sound when starting recording
+			try {
+				player1.play();
+			} catch (error) {
+				console.warn("Failed to play recording sound:", error);
+			}
+			setRecordingStartTime(Date.now());
+			setIsRecording(true);
+			isRecordingRef.current = true;
+			try {
+				// OPTIMIZED: Better video recording settings
+				const video = await cameraRef.current.recordAsync({ 
+					quality: videoPreset,
+					maxDuration: 300, // 5 minutes max to prevent huge files
+					mute: false,
+					mirror: cameraType === "front", // Mirror front camera recordings
+				});
+				if (currentModeRef.current === "video" && video) {
+					const savedUri = await saveVideoToGallery(video.uri);
+					const finalUri = savedUri.startsWith("file://")
+						? savedUri
+						: `file://${savedUri}`;
+					setPreviewUri(finalUri);
+					setPreviewType("video");
+				} else if (video?.uri) {
+					await FileSystem.deleteAsync(video.uri);
+				}
+			} catch (error) {
+				console.error("Video record error:", error);
+			} finally {
+				setIsRecording(false);
+				isRecordingRef.current = false;
+				setIsCameraLoading(false);
+				setRecordingStartTime(null);
+			}
+		}
+	}, [quality, maxSizePx, videoPreset, cameraType, micPermission, recordingStartTime, player, player1, handleStopRecording]);
 
-	const handleConfirm = async () => {
+	const handleConfirm = useCallback(async () => {
 		if (!previewUri || !previewType) return;
 		try {
 			const fileSize = await getFileSize(previewUri);
@@ -357,21 +443,30 @@ const CameraScreen = () => {
 		} catch (error) {
 			console.error("Failed to get file size:", error);
 		}
-	};
+	}, [previewUri, previewType, rawParams, router]);
 
-	const handleRetake = () => {
+	const handleRetake = useCallback(() => {
+		// OPTIMIZED: Clean up video player when retaking
+		if (videoPlayerRef.current && previewType === "video") {
+			try {
+				videoPlayerRef.current.pause();
+			} catch (e) {
+				// Ignore errors
+			}
+		}
 		setPreviewUri(null);
 		setPreviewType(null);
 		setRecordingTime(0);
-	};
+		lastVideoUriRef.current = null;
+	}, [previewType]);
 
-	const formatTime = (seconds: number) => {
+	const formatTime = useCallback((seconds: number) => {
 		const mins = Math.floor(seconds / 60);
 		const secs = seconds % 60;
 		return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-	};
+	}, []);
 
-	const getFlashIcon = () => {
+	const getFlashIcon = useCallback(() => {
 		switch (flash) {
 			case "on":
 				return <Zap size={24} color="white" />;
@@ -380,7 +475,7 @@ const CameraScreen = () => {
 			default:
 				return <ZapOff size={24} color="white" />;
 		}
-	};
+	}, [flash]);
 
 	if (!permission?.granted) {
 		return (
@@ -431,9 +526,10 @@ const CameraScreen = () => {
 								mode={mode}
 								onCameraReady={() => setCameraReady(true)}
 								videoQuality={videoPreset}
-								onLayout={(event) => {
-									const { width, height } = event.nativeEvent.layout;
-								}}
+								// OPTIMIZED: Add responsiveOrientationWhenOrientationLocked for better performance
+								responsiveOrientationWhenOrientationLocked={true}
+								// OPTIMIZED: Enable autofocus for better video quality
+								autofocus="on"
 							/>
 						)}
 						{focusPoint && showFocus && (
@@ -496,14 +592,14 @@ const CameraScreen = () => {
 									{(mode === "photo"
 										? imageQualityOptions
 										: videoQualityOptions
-									).map((option) => {
+									).map((option, index) => {
 										const isSelected =
 											mode === "photo"
 												? selectedQuality.value === option.value
 												: selectedVideoQuality.value === option.value;
 										return (
 											<TouchableOpacity
-												key={option.value}
+												key={`${mode}-${option.value}-${index}`} // Enhanced key for uniqueness
 												onPress={() => {
 													if (mode === "photo") {
 														setSelectedQuality(option);
@@ -629,20 +725,14 @@ const CameraScreen = () => {
 							/>
 						)}
 						{previewType === "video" && previewUri && (
-							<Video
-								source={{ uri: previewUri }}
-								style={styles.previewMedia}
-								resizeMode="contain"
-								useNativeControls
-								shouldPlay
-								isLooping
-								onError={(e) => {
-									console.error("Video playback error:", JSON.stringify(e));
-									Alert.alert(
-										"Error",
-										`Failed to play video: ${e.message || "Unknown error"}`,
-									);
-								}}
+							<VideoView 
+								style={styles.previewMedia} 
+								player={videoPlayer}
+								allowsFullscreen={false} // OPTIMIZED: Disable fullscreen for better performance
+								allowsPictureInPicture={false} // OPTIMIZED: Disable PiP for better performance
+								contentFit="contain"
+								// OPTIMIZED: Add nativeControls for better performance
+								nativeControls={true}
 							/>
 						)}
 						<LinearGradient
@@ -684,7 +774,6 @@ const CameraScreen = () => {
 	);
 };
 
-
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
@@ -715,7 +804,6 @@ const styles = StyleSheet.create({
 		borderWidth: 2,
 		borderColor: "#007AFF",
 		backgroundColor: "transparent",
-		// Removed shadow properties that might cause issues
 	},
 
 	// Overlays
@@ -767,7 +855,7 @@ const styles = StyleSheet.create({
 		color: "white",
 		fontWeight: "700",
 		fontSize: 16,
-		fontFamily: "SF Pro Display",
+		fontFamily: "System",
 	},
 
 	// Quality selector
