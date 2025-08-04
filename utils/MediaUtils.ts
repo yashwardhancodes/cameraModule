@@ -1,6 +1,6 @@
 // ../../utils/MediaUtils.ts
 import * as FileSystem from 'expo-file-system';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
 /**
@@ -14,19 +14,20 @@ export const compressAndSaveImage = async (
   // Ensure captures directory exists
   await ensureCaptureDirectory();
 
-  // Compress the image
-  const manipResult = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: size } }],
-    {
-      compress: quality,
-      format: ImageManipulator.SaveFormat.JPEG,
-    }
-  );
+  // Create image manipulator context and apply transformations
+  const context = ImageManipulator.manipulate(uri);
+  context.resize({ width: size, height: null });
+  
+  // Render and save the image
+  const image = await context.renderAsync();
+  const result = await image.saveAsync({
+    format: SaveFormat.JPEG,
+    compress: quality,
+  });
 
   // Copy to persistent location for preview
   const persistentPath = `${FileSystem.documentDirectory}captures/${Date.now()}.jpg`;
-  await FileSystem.copyAsync({ from: manipResult.uri, to: persistentPath });
+  await FileSystem.copyAsync({ from: result.uri, to: persistentPath });
 
   // Verify the file exists
   const fileInfo = await FileSystem.getInfoAsync(persistentPath);
@@ -82,17 +83,20 @@ export const compressImage = async (
 ): Promise<string> => {
   await ensureCaptureDirectory();
   
-  const manipResult = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: size } }],
-    {
-      compress: quality,
-      format: ImageManipulator.SaveFormat.JPEG,
-    }
-  );
+  // Create image manipulator context and apply transformations
+  const context = ImageManipulator.manipulate(uri);
+  context.resize({ width: size, height: null });
+  
+  // Render and save the image
+  const image = await context.renderAsync();
+  const result = await image.saveAsync({
+    format: SaveFormat.JPEG,
+    compress: quality,
+  });
 
+  // Copy to persistent location
   const newPath = `${FileSystem.documentDirectory}captures/${Date.now()}.jpg`;
-  await FileSystem.copyAsync({ from: manipResult.uri, to: newPath });
+  await FileSystem.copyAsync({ from: result.uri, to: newPath });
 
   return newPath;
 };
@@ -129,7 +133,6 @@ export const ensureCaptureDirectory = async (): Promise<void> => {
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   }
 };
-
 
 /**
  * Get the size of a file at a given URI (in bytes)

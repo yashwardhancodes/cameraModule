@@ -27,7 +27,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-	ActivityIndicator,
 	Dimensions,
 	Image,
 	ScrollView,
@@ -36,7 +35,7 @@ import {
 	TouchableOpacity,
 	View
 } from "react-native";
-import { compressAndSaveImage, getFileSize, saveVideoToGallery } from "../../utils/MediaUtils";
+import { compressAndSaveImage, deleteFile, getFileSize, saveVideoToGallery } from "../../utils/MediaUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -134,7 +133,7 @@ const CameraScreen = () => {
 
 	const [selectedQuality, setSelectedQuality] = useState(imageQualityOptions[1]);
 	const [selectedVideoQuality, setSelectedVideoQuality] = useState(videoQualityOptions[2]);
-	
+
 	// OPTIMIZED: Memoize quality values to prevent recalculations
 	const { quality, maxSizePx, videoPreset } = useMemo(() => ({
 		quality: selectedQuality.quality,
@@ -158,14 +157,14 @@ const CameraScreen = () => {
 	const currentModeRef = useRef(mode);
 	const isRecordingRef = useRef(false);
 	const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
-	
+
 	// OPTIMIZED: Refs for video player management
 	const videoPlayerRef = useRef<any>(null);
 	const lastVideoUriRef = useRef<string | null>(null);
 
 	// OPTIMIZED: Create video player only when needed and reuse
 	const videoPlayer = useVideoPlayer(
-		previewUri && previewType === "video" ? previewUri : null, 
+		previewUri && previewType === "video" ? previewUri : null,
 		useCallback((player) => {
 			videoPlayerRef.current = player;
 			if (previewUri && previewType === "video") {
@@ -236,7 +235,7 @@ const CameraScreen = () => {
 	useEffect(() => {
 		if (previewType === "video" && previewUri && videoPlayer && previewUri !== lastVideoUriRef.current) {
 			lastVideoUriRef.current = previewUri;
-			
+
 			const setupVideo = async () => {
 				try {
 					// OPTIMIZED: Clean up previous video first
@@ -247,7 +246,7 @@ const CameraScreen = () => {
 							// Ignore pause errors
 						}
 					}
-					
+
 					// OPTIMIZED: Use requestAnimationFrame for smoother transition
 					requestAnimationFrame(async () => {
 						try {
@@ -269,7 +268,7 @@ const CameraScreen = () => {
 
 			setupVideo();
 		}
-		
+
 		// Cleanup when preview is removed
 		return () => {
 			if (!previewUri && videoPlayerRef.current) {
@@ -400,7 +399,7 @@ const CameraScreen = () => {
 			isRecordingRef.current = true;
 			try {
 				// OPTIMIZED: Better video recording settings
-				const video = await cameraRef.current.recordAsync({ 
+				const video = await cameraRef.current.recordAsync({
 					quality: videoPreset,
 					maxDuration: 300, // 5 minutes max to prevent huge files
 					mute: false,
@@ -445,20 +444,31 @@ const CameraScreen = () => {
 		}
 	}, [previewUri, previewType, rawParams, router]);
 
-	const handleRetake = useCallback(() => {
-		// OPTIMIZED: Clean up video player when retaking
-		if (videoPlayerRef.current && previewType === "video") {
+	const handleRetake = useCallback(async () => {
+ 		if (videoPlayerRef.current && previewType === "video") {
 			try {
 				videoPlayerRef.current.pause();
 			} catch (e) {
 				// Ignore errors
 			}
 		}
-		setPreviewUri(null);
+
+ 		if (previewUri) {
+			try {
+				await deleteFile(previewUri);
+				console.log('File deleted successfully:', previewUri);
+			} catch (error) {
+				console.error('Failed to delete file:', previewUri, error);
+				// Continue with cleanup even if deletion fails
+			}
+		}
+
+ 		setPreviewUri(null);
 		setPreviewType(null);
 		setRecordingTime(0);
 		lastVideoUriRef.current = null;
-	}, [previewType]);
+	}, [previewType, previewUri]);
+
 
 	const formatTime = useCallback((seconds: number) => {
 		const mins = Math.floor(seconds / 60);
@@ -506,12 +516,7 @@ const CameraScreen = () => {
 		<View style={styles.container} ref={containerRef}>
 			{!previewUri ? (
 				<>
-					{!cameraReady && (
-						<View style={styles.loadingContainer}>
-							<ActivityIndicator size="large" color="#007AFF" />
-							<Text style={styles.loadingText}>Loading camera...</Text>
-						</View>
-					)}
+
 					<TouchableOpacity
 						style={styles.cameraTouchable}
 						activeOpacity={1}
@@ -621,7 +626,7 @@ const CameraScreen = () => {
 														style={[
 															styles.qualityLabel,
 															isSelected &&
-																styles.qualityLabelSelected,
+															styles.qualityLabelSelected,
 														]}
 													>
 														{option.label}
@@ -630,7 +635,7 @@ const CameraScreen = () => {
 														style={[
 															styles.qualityDescription,
 															isSelected &&
-																styles.qualityDescriptionSelected,
+															styles.qualityDescriptionSelected,
 														]}
 													>
 														{option.description}
@@ -725,8 +730,8 @@ const CameraScreen = () => {
 							/>
 						)}
 						{previewType === "video" && previewUri && (
-							<VideoView 
-								style={styles.previewMedia} 
+							<VideoView
+								style={styles.previewMedia}
 								player={videoPlayer}
 								allowsFullscreen={false} // OPTIMIZED: Disable fullscreen for better performance
 								allowsPictureInPicture={false} // OPTIMIZED: Disable PiP for better performance
