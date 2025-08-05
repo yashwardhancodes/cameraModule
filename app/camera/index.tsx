@@ -89,12 +89,7 @@ const imageQualityOptions: ImageQualityOption[] = [{
 },
 ];
 
-const videoQualityOptions: VideoQualityOption[] = [{
-	label: "Very Low",
-	value: "480p",
-	description: "Minimal file size, fastest upload, low clarity",
-	icon: "🚀",
-},
+const videoQualityOptions: VideoQualityOption[] = [
 {
 	label: "Low (480p)",
 	value: "480p",
