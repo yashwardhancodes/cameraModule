@@ -6,28 +6,13 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 /**
  * Save photo to internal storage and return a local file URI for preview
  */
-export const compressAndSaveImage = async (
-  uri: string,
-  quality: number = 0.6,
-  size: number = 1024
-): Promise<string> => {
+export const saveImage = async (uri: string): Promise<string> => {
   // Ensure captures directory exists
   await ensureCaptureDirectory();
 
-  // Create image manipulator context and apply transformations
-  const context = ImageManipulator.manipulate(uri);
-  context.resize({ width: size, height: null });
-  
-  // Render and save the image
-  const image = await context.renderAsync();
-  const result = await image.saveAsync({
-    format: SaveFormat.JPEG,
-    compress: quality,
-  });
-
   // Copy to persistent location for preview
   const persistentPath = `${FileSystem.documentDirectory}captures/${Date.now()}.jpg`;
-  await FileSystem.copyAsync({ from: result.uri, to: persistentPath });
+  await FileSystem.copyAsync({ from: uri, to: persistentPath });
 
   // Verify the file exists
   const fileInfo = await FileSystem.getInfoAsync(persistentPath);

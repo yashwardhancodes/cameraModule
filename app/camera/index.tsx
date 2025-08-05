@@ -35,85 +35,111 @@ import {
 	TouchableOpacity,
 	View
 } from "react-native";
-import { compressAndSaveImage, deleteFile, getFileSize, saveVideoToGallery } from "../../utils/MediaUtils";
+import { deleteFile, getFileSize, saveImage, saveVideoToGallery } from "../../utils/MediaUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-const imageQualityOptions = [
-	{
-		label: "Low (Small size)",
-		value: "low",
-		maxSize: 640,
-		quality: 0.4,
-		description: "640px max, 40% quality – fastest to upload",
-		icon: "🚀",
-	},
-	{
-		label: "Medium (Recommended)",
-		value: "medium",
-		maxSize: 1024,
-		quality: 0.6,
-		description: "1024px max, 60% quality – good balance",
-		icon: "⚡",
-	},
-	{
-		label: "High (Better details)",
-		value: "high",
-		maxSize: 1600,
-		quality: 0.8,
-		description: "1600px max, 80% quality – slower to upload",
-		icon: "✨",
-	},
-	{
-		label: "Original (No compression)",
-		value: "original",
-		maxSize: null,
-		quality: 1.0,
-		description: "Original size and quality – large files",
-		icon: "💎",
-	},
+interface ImageQualityOption {
+	label: string;
+	value: string;
+	maxSize: number;
+	quality: number;
+	description: string;
+	icon: string;
+}
+
+interface VideoQualityOption {
+	label: string;
+	value: "480p" | "720p" | "1080p" | "2160p" | "4:3";
+	description: string;
+	icon: string;
+}
+
+const imageQualityOptions: ImageQualityOption[] = [{
+	label: "Low (Small size)",
+	value: "low",
+	maxSize: 640,
+	quality: 0.4,
+	description: "640px max, 40% quality – fastest to upload",
+	icon: "🚀",
+},
+{
+	label: "Medium (Recommended)",
+	value: "medium",
+	maxSize: 1024,
+	quality: 0.6,
+	description: "1024px max, 60% quality – good balance",
+	icon: "⚡",
+},
+{
+	label: "High (Better details)",
+	value: "high",
+	maxSize: 1600,
+	quality: 0.8,
+	description: "1600px max, 80% quality – slower to upload",
+	icon: "✨",
+},
+{
+	label: "Original (No compression)",
+	value: "original",
+	maxSize: 2200,
+	quality: 1.0,
+	description: "Original size and quality – large files",
+	icon: "💎",
+},
 ];
 
-// OPTIMIZED: Better video quality presets for performance
-const videoQualityOptions = [
-	{
-		label: "Very Low",
-		value: "360p", // Changed to unique value
-		description: "Minimal file size, fastest upload, low clarity",
-		icon: "🚀",
-	},
-	{
-		label: "Low (480p)",
-		value: "480p",
-		description: "Faster upload, basic visibility",
-		icon: "📱",
-	},
-	{
-		label: "Medium (720p)",
-		value: "720p",
-		description: "Good balance of quality and file size",
-		icon: "⚡",
-	},
-	{
-		label: "High (1080p)",
-		value: "1080p", // Fixed from "1088p" to standard "1080p"
-		description: "Sharp quality, larger file size",
-		icon: "✨",
-	},
-	{
-		label: "Ultra (4K)",
-		value: "2160p",
-		description: "Best quality, largest file size",
-		icon: "💎",
-	},
-];
+const videoQualityOptions: VideoQualityOption[] = [{
+	label: "Very Low",
+	value: "480p",
+	description: "Minimal file size, fastest upload, low clarity",
+	icon: "🚀",
+},
+{
+	label: "Low (480p)",
+	value: "480p",
+	description: "Faster upload, basic visibility",
+	icon: "📱",
+},
+{
+	label: "Medium (720p)",
+	value: "720p",
+	description: "Good balance of quality and file size",
+	icon: "⚡",
+},
+{
+	label: "High (1080p)",
+	value: "1080p",
+	description: "Sharp quality, larger file size",
+	icon: "✨",
+},
+{
+	label: "Ultra (4K)",
+	value: "2160p",
+	description: "Best quality, largest file size",
+	icon: "💎",
+},
+] satisfies {
+	label: string;
+	value: "2160p" | "1080p" | "720p" | "480p" | "4:3";
+	description: string;
+	icon: string;
+}[];
 
-const DEFAULT_QUALITY = 0.6;
+
 const DEFAULT_MAX_SIZE_PX = 1024;
-const DEFAULT_VIDEO_PRESET = "720p"; // Changed from 480p for better quality
+
 
 const audioSource = require('../../assets/shutter.mp3');
 const audioSource1 = require('../../assets/recording.mp3');
+
+type CustomVideoPlayer = {
+	loop: boolean;
+	volume: number;
+	playbackRate: number;
+	play: () => void;
+};
+
 
 const CameraScreen = () => {
 	const cameraRef = useRef<CameraView | null>(null);
@@ -126,9 +152,9 @@ const CameraScreen = () => {
 	const player1 = useAudioPlayer(audioSource1);
 
 	const rawParams = useLocalSearchParams();
-	const mode = (rawParams.mode as "photo" | "video") ?? "photo";
+	const mode = (rawParams.mode as "picture" | "video") ?? "picture";
 	const mediaPath = rawParams.path as string | undefined;
-	const mediaType = rawParams.type as "photo" | "video" | undefined;
+	const mediaType = rawParams.type as "picture" | "video" | undefined;
 	const mediaSize = rawParams.size as string | undefined;
 
 	const [selectedQuality, setSelectedQuality] = useState(imageQualityOptions[1]);
@@ -148,7 +174,7 @@ const CameraScreen = () => {
 	const [isRecording, setIsRecording] = useState<boolean>(false);
 	const [isCameraLoading, setIsCameraLoading] = useState<boolean>(false);
 	const [previewUri, setPreviewUri] = useState<string | null>(null);
-	const [previewType, setPreviewType] = useState<"photo" | "video" | null>(null);
+	const [previewType, setPreviewType] = useState<"picture" | "video" | null>(null);
 	const [loading, setLoading] = useState<boolean>(false);
 	const [recordingTime, setRecordingTime] = useState<number>(0);
 	const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
@@ -165,7 +191,7 @@ const CameraScreen = () => {
 	// OPTIMIZED: Create video player only when needed and reuse
 	const videoPlayer = useVideoPlayer(
 		previewUri && previewType === "video" ? previewUri : null,
-		useCallback((player) => {
+		useCallback((player: CustomVideoPlayer) => {
 			videoPlayerRef.current = player;
 			if (previewUri && previewType === "video") {
 				// OPTIMIZED: Add error handling and performance settings
@@ -283,7 +309,7 @@ const CameraScreen = () => {
 
 	const toggleMode = useCallback(() => {
 		router.setParams({
-			mode: mode === "photo" ? "video" : "photo",
+			mode: mode === "picture" ? "video" : "picture",
 			path: previewUri || mediaPath,
 			type: previewType || mediaType,
 			size: mediaSize,
@@ -338,7 +364,7 @@ const CameraScreen = () => {
 		}
 		await Haptics.selectionAsync();
 
-		if (currentModeRef.current === "photo") {
+		if (currentModeRef.current === "picture") {
 			try {
 				// Play shutter sound for photo
 				try {
@@ -349,15 +375,15 @@ const CameraScreen = () => {
 
 				// OPTIMIZED: Better photo capture settings
 				const photo = await cameraRef.current.takePictureAsync({
-					quality: 0.9, // Slightly reduced for performance
-					skipProcessing: false, // Enable processing for better quality
-					exif: false, // Disable EXIF for smaller files
+					quality: quality,
+					skipProcessing: false,
+					exif: false,
 				});
 				if (photo) {
 					setLoading(true);
-					const savedPath = await compressAndSaveImage(photo.uri, quality, maxSizePx);
+					const savedPath = await saveImage(photo.uri);
 					setPreviewUri(savedPath);
-					setPreviewType("photo");
+					setPreviewType("picture");
 					setLoading(false);
 				}
 			} catch (error) {
@@ -400,9 +426,7 @@ const CameraScreen = () => {
 			try {
 				// OPTIMIZED: Better video recording settings
 				const video = await cameraRef.current.recordAsync({
-					quality: videoPreset,
 					maxDuration: 300, // 5 minutes max to prevent huge files
-					mute: false,
 					mirror: cameraType === "front", // Mirror front camera recordings
 				});
 				if (currentModeRef.current === "video" && video) {
@@ -445,7 +469,7 @@ const CameraScreen = () => {
 	}, [previewUri, previewType, rawParams, router]);
 
 	const handleRetake = useCallback(async () => {
- 		if (videoPlayerRef.current && previewType === "video") {
+		if (videoPlayerRef.current && previewType === "video") {
 			try {
 				videoPlayerRef.current.pause();
 			} catch (e) {
@@ -453,7 +477,7 @@ const CameraScreen = () => {
 			}
 		}
 
- 		if (previewUri) {
+		if (previewUri) {
 			try {
 				await deleteFile(previewUri);
 				console.log('File deleted successfully:', previewUri);
@@ -463,7 +487,7 @@ const CameraScreen = () => {
 			}
 		}
 
- 		setPreviewUri(null);
+		setPreviewUri(null);
 		setPreviewType(null);
 		setRecordingTime(0);
 		lastVideoUriRef.current = null;
@@ -531,7 +555,6 @@ const CameraScreen = () => {
 								mode={mode}
 								onCameraReady={() => setCameraReady(true)}
 								videoQuality={videoPreset}
-								// OPTIMIZED: Add responsiveOrientationWhenOrientationLocked for better performance
 								responsiveOrientationWhenOrientationLocked={true}
 								// OPTIMIZED: Enable autofocus for better video quality
 								autofocus="on"
@@ -573,7 +596,7 @@ const CameraScreen = () => {
 									style={styles.topButton}
 								>
 									<Text style={styles.qualityLabel}>
-										{mode === "photo"
+										{mode === "picture"
 											? selectedQuality.icon
 											: selectedVideoQuality.icon}
 									</Text>
@@ -584,7 +607,7 @@ const CameraScreen = () => {
 							<BlurView intensity={50} style={styles.qualityOverlay}>
 								<View style={styles.qualityHeader}>
 									<Text style={styles.qualityTitle}>
-										{mode === "photo" ? "Photo Quality" : "Video Quality"}
+										{mode === "picture" ? "Photo Quality" : "Video Quality"}
 									</Text>
 									<TouchableOpacity onPress={() => setShowQualitySelector(false)}>
 										<X size={20} color="white" />
@@ -594,57 +617,53 @@ const CameraScreen = () => {
 									style={styles.qualityList}
 									showsVerticalScrollIndicator={false}
 								>
-									{(mode === "photo"
-										? imageQualityOptions
-										: videoQualityOptions
-									).map((option, index) => {
-										const isSelected =
-											mode === "photo"
-												? selectedQuality.value === option.value
-												: selectedVideoQuality.value === option.value;
-										return (
-											<TouchableOpacity
-												key={`${mode}-${option.value}-${index}`} // Enhanced key for uniqueness
-												onPress={() => {
-													if (mode === "photo") {
-														setSelectedQuality(option);
-													} else {
-														setSelectedVideoQuality(option);
-													}
-													setShowQualitySelector(false);
-												}}
-												style={[
-													styles.qualityOption,
-													isSelected && styles.qualityOptionSelected,
-												]}
-											>
-												<Text style={styles.qualityIcon}>
-													{option.icon}
-												</Text>
-												<View style={styles.qualityText}>
-													<Text
-														style={[
-															styles.qualityLabel,
-															isSelected &&
-															styles.qualityLabelSelected,
-														]}
-													>
-														{option.label}
-													</Text>
-													<Text
-														style={[
-															styles.qualityDescription,
-															isSelected &&
-															styles.qualityDescriptionSelected,
-														]}
-													>
-														{option.description}
-													</Text>
-												</View>
-												{isSelected && <Check size={20} color="#007AFF" />}
-											</TouchableOpacity>
-										);
-									})}
+									{(mode === "picture" ? imageQualityOptions : videoQualityOptions).map(
+										(option, index) => {
+											const isSelected =
+												mode === "picture"
+													? selectedQuality.value === option.value
+													: selectedVideoQuality.value === option.value;
+
+											return (
+												<TouchableOpacity
+													key={`${mode}-${option.value}-${index}`}
+													onPress={() => {
+														if (mode === "picture") {
+															setSelectedQuality(option as ImageQualityOption);
+														} else {
+															setSelectedVideoQuality(option as VideoQualityOption);
+														}
+														setShowQualitySelector(false);
+													}}
+													style={[
+														styles.qualityOption,
+														isSelected && styles.qualityOptionSelected,
+													]}
+												>
+													<Text style={styles.qualityIcon}>{option.icon}</Text>
+													<View style={styles.qualityText}>
+														<Text
+															style={[
+																styles.qualityLabel,
+																isSelected && styles.qualityLabelSelected,
+															]}
+														>
+															{option.label}
+														</Text>
+														<Text
+															style={[
+																styles.qualityDescription,
+																isSelected && styles.qualityDescriptionSelected,
+															]}
+														>
+															{option.description}
+														</Text>
+													</View>
+													{isSelected && <Check size={20} color="#007AFF" />}
+												</TouchableOpacity>
+											);
+										}
+									)}
 								</ScrollView>
 							</BlurView>
 						)}
@@ -655,26 +674,26 @@ const CameraScreen = () => {
 							<View style={styles.bottomControls}>
 								<TouchableOpacity onPress={toggleMode} style={styles.modeButton}>
 									<BlurView intensity={20} style={styles.modeButtonBlur}>
-										{mode === "photo" ? (
+										{mode === "picture" ? (
 											<VideoIcon size={20} color="white" />
 										) : (
 											<Camera size={20} color="white" />
 										)}
 									</BlurView>
 									<Text style={styles.modeText}>
-										{mode === "photo" ? "Video" : "Photo"}
+										{mode === "picture" ? "Video" : "picture"}
 									</Text>
 								</TouchableOpacity>
 								<TouchableOpacity
 									onPress={handleShutter}
 									disabled={
-										(isCameraLoading && mode === "photo") ||
+										(isCameraLoading && mode === "picture") ||
 										(mode === "video" && isRecording && !canStopRecording())
 									}
 									style={[
 										styles.shutterButton,
 										isRecording && styles.shutterButtonRecording,
-										((isCameraLoading && mode === "photo") ||
+										((isCameraLoading && mode === "picture") ||
 											(mode === "video" &&
 												isRecording &&
 												!canStopRecording())) && { opacity: 0.5 },
@@ -686,9 +705,9 @@ const CameraScreen = () => {
 											isRecording && styles.shutterInnerRecording,
 										]}
 									>
-										{isCameraLoading && mode === "photo" ? (
+										{isCameraLoading && mode === "picture" ? (
 											<Loader size={28} color="white" />
-										) : mode === "photo" ? (
+										) : mode === "picture" ? (
 											<Camera size={28} color="white" />
 										) : isRecording ? (
 											<View style={styles.stopIcon} />
@@ -722,7 +741,7 @@ const CameraScreen = () => {
 			) : (
 				<View style={styles.previewContainer}>
 					<LinearGradient colors={["#000", "#1a1a1a"]} style={styles.previewBackground}>
-						{previewType === "photo" && previewUri && (
+						{previewType === "picture" && previewUri && (
 							<Image
 								source={{ uri: previewUri }}
 								style={styles.previewMedia}
