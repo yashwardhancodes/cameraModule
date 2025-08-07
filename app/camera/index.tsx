@@ -39,102 +39,82 @@ import { deleteFile, getFileSize, saveImage, saveVideoToGallery } from "../../ut
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-interface ImageQualityOption {
-	label: string;
-	value: string;
-	maxSize: number;
-	quality: number;
-	description: string;
-	icon: string;
-}
-
-interface VideoQualityOption {
-	label: string;
-	value: "480p" | "720p" | "1080p" | "2160p" | "4:3";
-	description: string;
-	icon: string;
-}
-
-const imageQualityOptions: ImageQualityOption[] = [{
-	label: "Low (Small size)",
-	value: "low",
-	maxSize: 640,
-	quality: 0.4,
-	description: "640px max, 40% quality – fastest to upload",
-	icon: "🚀",
-},
-{
-	label: "Medium (Recommended)",
-	value: "medium",
-	maxSize: 1024,
-	quality: 0.6,
-	description: "1024px max, 60% quality – good balance",
-	icon: "⚡",
-},
-{
-	label: "High (Better details)",
-	value: "high",
-	maxSize: 1600,
-	quality: 0.8,
-	description: "1600px max, 80% quality – slower to upload",
-	icon: "✨",
-},
-{
-	label: "Original (No compression)",
-	value: "original",
-	maxSize: 2200,
-	quality: 1.0,
-	description: "Original size and quality – large files",
-	icon: "💎",
-},
+const imageQualityOptions = [
+	{
+		label: "Low (Small size)",
+		value: "low",
+		maxSize: "640x480",
+		quality: 0.4,
+		description: "640x480 resolution, 40% quality – fastest to upload",
+		icon: "🚀",
+	},
+	{
+		label: "Medium (Recommended)",
+		value: "medium",
+		maxSize: "1024x768",
+		quality: 0.6,
+		description: "1024x768 resolution, 60% quality – good balance",
+		icon: "⚡",
+	},
+	{
+		label: "High (Better details)",
+		value: "high",
+		maxSize: "1600x1200",
+		quality: 0.8,
+		description: "1600x1200 resolution, 80% quality – slower to upload",
+		icon: "✨",
+	},
+	{
+		label: "Original (No compression)",
+		value: "original",
+		maxSize: "1920x1440", // or max your device supports
+		quality: 1.0,
+		description: "1920x1440 resolution, 100% quality – large files",
+		icon: "💎",
+	},
 ];
 
-const videoQualityOptions: VideoQualityOption[] = [
-{
-	label: "Low (480p)",
-	value: "480p",
-	description: "Faster upload, basic visibility",
-	icon: "📱",
-},
-{
-	label: "Medium (720p)",
-	value: "720p",
-	description: "Good balance of quality and file size",
-	icon: "⚡",
-},
-{
-	label: "High (1080p)",
-	value: "1080p",
-	description: "Sharp quality, larger file size",
-	icon: "✨",
-},
-{
-	label: "Ultra (4K)",
-	value: "2160p",
-	description: "Best quality, largest file size",
-	icon: "💎",
-},
-] satisfies {
-	label: string;
-	value: "2160p" | "1080p" | "720p" | "480p" | "4:3";
-	description: string;
-	icon: string;
-}[];
+// OPTIMIZED: Better video quality presets for performance
+type VideoQuality = '4:3' | '480p' | '720p' | '1080p' | '2160p';
+
+const videoQualityOptions: { label: string; value: VideoQuality; description: string; icon: string }[] = [
+  {
+    label: "Very Low",
+    value: '4:3',
+    description: "Minimal file size, fastest upload, low clarity",
+    icon: "🚀",
+  },
+  {
+    label: "Low (480p)",
+    value: '480p',
+    description: "Faster upload, basic visibility",
+    icon: "📱",
+  },
+  {
+    label: "Medium (720p)",
+    value: '720p',
+    description: "Good balance of quality and file size",
+    icon: "⚡",
+  },
+  {
+    label: "High (1080p)",
+    value: '1080p',
+    description: "Sharp quality, larger file size",
+    icon: "✨",
+  },
+  {
+    label: "Ultra (4K)",
+    value: '2160p',
+    description: "Best quality, largest file size",
+    icon: "💎",
+  },
+];
 
 
-const DEFAULT_MAX_SIZE_PX = 1024;
-
+ 
 
 const audioSource = require('../../assets/shutter.mp3');
 const audioSource1 = require('../../assets/recording.mp3');
-
-type CustomVideoPlayer = {
-	loop: boolean;
-	volume: number;
-	playbackRate: number;
-	play: () => void;
-};
-
 
 const CameraScreen = () => {
 	const cameraRef = useRef<CameraView | null>(null);
@@ -158,7 +138,7 @@ const CameraScreen = () => {
 	// OPTIMIZED: Memoize quality values to prevent recalculations
 	const { quality, maxSizePx, videoPreset } = useMemo(() => ({
 		quality: selectedQuality.quality,
-		maxSizePx: selectedQuality.maxSize || DEFAULT_MAX_SIZE_PX,
+		maxSizePx: selectedQuality.maxSize,
 		videoPreset: selectedVideoQuality.value
 	}), [selectedQuality, selectedVideoQuality]);
 
@@ -186,7 +166,7 @@ const CameraScreen = () => {
 	// OPTIMIZED: Create video player only when needed and reuse
 	const videoPlayer = useVideoPlayer(
 		previewUri && previewType === "video" ? previewUri : null,
-		useCallback((player: CustomVideoPlayer) => {
+		useCallback((player:any) => {
 			videoPlayerRef.current = player;
 			if (previewUri && previewType === "video") {
 				// OPTIMIZED: Add error handling and performance settings
@@ -361,28 +341,28 @@ const CameraScreen = () => {
 
 		if (currentModeRef.current === "picture") {
 			try {
-				// Play shutter sound for photo
+				// Play shutter sound for picture
 				try {
 					player.play();
 				} catch (error) {
 					console.warn("Failed to play shutter sound:", error);
 				}
 
-				// OPTIMIZED: Better photo capture settings
-				const photo = await cameraRef.current.takePictureAsync({
-					quality: quality,
-					skipProcessing: false,
-					exif: false,
+				// OPTIMIZED: Better picture capture settings
+				const picture = await cameraRef.current.takePictureAsync({
+					quality: 0.9, // Slightly reduced for performance
+					skipProcessing: false, // Enable processing for better quality
+					exif: false, // Disable EXIF for smaller files
 				});
-				if (photo) {
+				if (picture) {
 					setLoading(true);
-					const savedPath = await saveImage(photo.uri);
-					setPreviewUri(savedPath);
+					const savedPath = await saveImage(picture.uri );
+					setPreviewUri(savedPath.uri);
 					setPreviewType("picture");
 					setLoading(false);
 				}
 			} catch (error) {
-				console.error("Photo capture error:", error);
+				console.error("picture capture error:", error);
 				setLoading(false);
 			} finally {
 				setIsCameraLoading(false);
@@ -421,8 +401,8 @@ const CameraScreen = () => {
 			try {
 				// OPTIMIZED: Better video recording settings
 				const video = await cameraRef.current.recordAsync({
-					maxDuration: 300, // 5 minutes max to prevent huge files
-					mirror: cameraType === "front", // Mirror front camera recordings
+ 					maxDuration: 300, // 5 minutes max to prevent huge files
+ 					mirror: cameraType === "front", // Mirror front camera recordings
 				});
 				if (currentModeRef.current === "video" && video) {
 					const savedUri = await saveVideoToGallery(video.uri);
@@ -464,7 +444,7 @@ const CameraScreen = () => {
 	}, [previewUri, previewType, rawParams, router]);
 
 	const handleRetake = useCallback(async () => {
-		if (videoPlayerRef.current && previewType === "video") {
+ 		if (videoPlayerRef.current && previewType === "video") {
 			try {
 				videoPlayerRef.current.pause();
 			} catch (e) {
@@ -472,7 +452,7 @@ const CameraScreen = () => {
 			}
 		}
 
-		if (previewUri) {
+ 		if (previewUri) {
 			try {
 				await deleteFile(previewUri);
 				console.log('File deleted successfully:', previewUri);
@@ -482,7 +462,7 @@ const CameraScreen = () => {
 			}
 		}
 
-		setPreviewUri(null);
+ 		setPreviewUri(null);
 		setPreviewType(null);
 		setRecordingTime(0);
 		lastVideoUriRef.current = null;
@@ -516,7 +496,7 @@ const CameraScreen = () => {
 					</Text>
 					<Text style={styles.permissionMessage}>
 						{t("camera.permissionMessage") ||
-							"This app needs camera access to take photos and videos. Please enable it in settings."}
+							"This app needs camera access to take pictures and videos. Please enable it in settings."}
 					</Text>
 					<TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
 						<Text style={styles.permissionButtonText}>
@@ -549,7 +529,9 @@ const CameraScreen = () => {
 								flash={flash}
 								mode={mode}
 								onCameraReady={() => setCameraReady(true)}
-								videoQuality={videoPreset}
+								videoQuality={videoPreset as VideoQuality}
+								pictureSize={maxSizePx}
+								// OPTIMIZED: Add responsiveOrientationWhenOrientationLocked for better performance
 								responsiveOrientationWhenOrientationLocked={true}
 								// OPTIMIZED: Enable autofocus for better video quality
 								autofocus="on"
@@ -602,7 +584,7 @@ const CameraScreen = () => {
 							<BlurView intensity={50} style={styles.qualityOverlay}>
 								<View style={styles.qualityHeader}>
 									<Text style={styles.qualityTitle}>
-										{mode === "picture" ? "Photo Quality" : "Video Quality"}
+										{mode === "picture" ? "picture Quality" : "Video Quality"}
 									</Text>
 									<TouchableOpacity onPress={() => setShowQualitySelector(false)}>
 										<X size={20} color="white" />
@@ -612,53 +594,57 @@ const CameraScreen = () => {
 									style={styles.qualityList}
 									showsVerticalScrollIndicator={false}
 								>
-									{(mode === "picture" ? imageQualityOptions : videoQualityOptions).map(
-										(option, index) => {
-											const isSelected =
-												mode === "picture"
-													? selectedQuality.value === option.value
-													: selectedVideoQuality.value === option.value;
-
-											return (
-												<TouchableOpacity
-													key={`${mode}-${option.value}-${index}`}
-													onPress={() => {
-														if (mode === "picture") {
-															setSelectedQuality(option as ImageQualityOption);
-														} else {
-															setSelectedVideoQuality(option as VideoQualityOption);
-														}
-														setShowQualitySelector(false);
-													}}
-													style={[
-														styles.qualityOption,
-														isSelected && styles.qualityOptionSelected,
-													]}
-												>
-													<Text style={styles.qualityIcon}>{option.icon}</Text>
-													<View style={styles.qualityText}>
-														<Text
-															style={[
-																styles.qualityLabel,
-																isSelected && styles.qualityLabelSelected,
-															]}
-														>
-															{option.label}
-														</Text>
-														<Text
-															style={[
-																styles.qualityDescription,
-																isSelected && styles.qualityDescriptionSelected,
-															]}
-														>
-															{option.description}
-														</Text>
-													</View>
-													{isSelected && <Check size={20} color="#007AFF" />}
-												</TouchableOpacity>
-											);
-										}
-									)}
+									{(mode === "picture"
+										? imageQualityOptions
+										: videoQualityOptions
+									).map((option, index) => {
+										const isSelected =
+											mode === "picture"
+												? selectedQuality.value === option.value
+												: selectedVideoQuality.value === option.value;
+										return (
+											<TouchableOpacity
+												key={`${mode}-${option.value}-${index}`} // Enhanced key for uniqueness
+												onPress={() => {
+													if (mode === "picture") {
+														setSelectedQuality(option);
+													} else {
+														setSelectedVideoQuality(option);
+													}
+													setShowQualitySelector(false);
+												}}
+												style={[
+													styles.qualityOption,
+													isSelected && styles.qualityOptionSelected,
+												]}
+											>
+												<Text style={styles.qualityIcon}>
+													{option.icon}
+												</Text>
+												<View style={styles.qualityText}>
+													<Text
+														style={[
+															styles.qualityLabel,
+															isSelected &&
+															styles.qualityLabelSelected,
+														]}
+													>
+														{option.label}
+													</Text>
+													<Text
+														style={[
+															styles.qualityDescription,
+															isSelected &&
+															styles.qualityDescriptionSelected,
+														]}
+													>
+														{option.description}
+													</Text>
+												</View>
+												{isSelected && <Check size={20} color="#007AFF" />}
+											</TouchableOpacity>
+										);
+									})}
 								</ScrollView>
 							</BlurView>
 						)}
@@ -781,7 +767,7 @@ const CameraScreen = () => {
 										<Check size={24} color="white" />
 									</LinearGradient>
 									<Text style={styles.previewButtonText}>
-										{t("camera.confirm") || "Use Photo"}
+										{t("camera.confirm") || "Use picture"}
 									</Text>
 								</TouchableOpacity>
 							</View>

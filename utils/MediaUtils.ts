@@ -2,32 +2,26 @@
 import * as FileSystem from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-
-/**
- * Save photo to internal storage and return a local file URI for preview
- */
-export const saveImage = async (uri: string): Promise<string> => {
-  // Ensure captures directory exists
+import { Image } from 'react-native';
+ 
+export const saveImage = async (uri: string): Promise<{ uri: string; width: number; height: number }> => {
   await ensureCaptureDirectory();
 
-  // Copy to persistent location for preview
   const persistentPath = `${FileSystem.documentDirectory}captures/${Date.now()}.jpg`;
   await FileSystem.copyAsync({ from: uri, to: persistentPath });
 
-  // Verify the file exists
-  const fileInfo = await FileSystem.getInfoAsync(persistentPath);
-  if (!fileInfo.exists) {
-    throw new Error(`Failed to copy image to ${persistentPath}`);
-  }
-
-  // Return the persistent local path for preview
+  // Ensure URI is file:// prefixed
   const finalUri = persistentPath.startsWith('file://') ? persistentPath : `file://${persistentPath}`;
-  return finalUri;
+
+  // Get image dimensions
+  return new Promise((resolve, reject) => {
+    Image.getSize(finalUri, (width, height) => {
+      resolve({ uri: finalUri, width, height });
+    }, reject);
+  });
 };
 
-/**
- * Save video to internal storage and return a persistent URI
- */
+ 
 export const saveVideoToGallery = async (uri: string): Promise<string> => {
   // Ensure captures directory exists
   await ensureCaptureDirectory();
