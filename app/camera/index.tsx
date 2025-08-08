@@ -78,40 +78,40 @@ const imageQualityOptions = [
 type VideoQuality = '4:3' | '480p' | '720p' | '1080p' | '2160p';
 
 const videoQualityOptions: { label: string; value: VideoQuality; description: string; icon: string }[] = [
-  {
-    label: "Very Low",
-    value: '4:3',
-    description: "Minimal file size, fastest upload, low clarity",
-    icon: "🚀",
-  },
-  {
-    label: "Low (480p)",
-    value: '480p',
-    description: "Faster upload, basic visibility",
-    icon: "📱",
-  },
-  {
-    label: "Medium (720p)",
-    value: '720p',
-    description: "Good balance of quality and file size",
-    icon: "⚡",
-  },
-  {
-    label: "High (1080p)",
-    value: '1080p',
-    description: "Sharp quality, larger file size",
-    icon: "✨",
-  },
-  {
-    label: "Ultra (4K)",
-    value: '2160p',
-    description: "Best quality, largest file size",
-    icon: "💎",
-  },
+	{
+		label: "Very Low",
+		value: '4:3',
+		description: "Minimal file size, fastest upload, low clarity",
+		icon: "🚀",
+	},
+	{
+		label: "Low (480p)",
+		value: '480p',
+		description: "Faster upload, basic visibility",
+		icon: "📱",
+	},
+	{
+		label: "Medium (720p)",
+		value: '720p',
+		description: "Good balance of quality and file size",
+		icon: "⚡",
+	},
+	{
+		label: "High (1080p)",
+		value: '1080p',
+		description: "Sharp quality, larger file size",
+		icon: "✨",
+	},
+	{
+		label: "Ultra (4K)",
+		value: '2160p',
+		description: "Best quality, largest file size",
+		icon: "💎",
+	},
 ];
 
 
- 
+
 
 const audioSource = require('../../assets/shutter.mp3');
 const audioSource1 = require('../../assets/recording.mp3');
@@ -166,7 +166,7 @@ const CameraScreen = () => {
 	// OPTIMIZED: Create video player only when needed and reuse
 	const videoPlayer = useVideoPlayer(
 		previewUri && previewType === "video" ? previewUri : null,
-		useCallback((player:any) => {
+		useCallback((player: any) => {
 			videoPlayerRef.current = player;
 			if (previewUri && previewType === "video") {
 				// OPTIMIZED: Add error handling and performance settings
@@ -222,7 +222,7 @@ const CameraScreen = () => {
 		// OPTIMIZED: Shorter timeout for faster camera mounting
 		const timeout = setTimeout(() => {
 			setIsCameraMounted(true);
-		}, 50);
+		}, 100);
 
 		return () => {
 			clearTimeout(timeout);
@@ -339,9 +339,11 @@ const CameraScreen = () => {
 		}
 		await Haptics.selectionAsync();
 
+
+
 		if (currentModeRef.current === "picture") {
 			try {
-				// Play shutter sound for picture
+
 				try {
 					player.play();
 				} catch (error) {
@@ -356,7 +358,8 @@ const CameraScreen = () => {
 				});
 				if (picture) {
 					setLoading(true);
-					const savedPath = await saveImage(picture.uri );
+					const savedPath = await saveImage(picture.uri);
+					console.log("Resolution : " + savedPath.width + " X " + savedPath.height);
 					setPreviewUri(savedPath.uri);
 					setPreviewType("picture");
 					setLoading(false);
@@ -374,9 +377,12 @@ const CameraScreen = () => {
 				return;
 			}
 			if (isRecordingRef.current) {
+				console.log("reached here")
 				const now = Date.now();
 				if (recordingStartTime && now - recordingStartTime < 1000) {
 					setIsCameraLoading(false);
+					console.log("reached here")
+
 					return;
 				}
 				// Play recording sound when stopping recording
@@ -401,10 +407,11 @@ const CameraScreen = () => {
 			try {
 				// OPTIMIZED: Better video recording settings
 				const video = await cameraRef.current.recordAsync({
- 					maxDuration: 300, // 5 minutes max to prevent huge files
- 					mirror: cameraType === "front", // Mirror front camera recordings
+					maxDuration: 300, // 5 minutes max to prevent huge files
+					mirror: cameraType === "front", // Mirror front camera recordings
 				});
 				if (currentModeRef.current === "video" && video) {
+					console.log("CurrentModeRef:", currentModeRef); // Check if it's undefined/null
 					const savedUri = await saveVideoToGallery(video.uri);
 					const finalUri = savedUri.startsWith("file://")
 						? savedUri
@@ -444,7 +451,7 @@ const CameraScreen = () => {
 	}, [previewUri, previewType, rawParams, router]);
 
 	const handleRetake = useCallback(async () => {
- 		if (videoPlayerRef.current && previewType === "video") {
+		if (videoPlayerRef.current && previewType === "video") {
 			try {
 				videoPlayerRef.current.pause();
 			} catch (e) {
@@ -452,7 +459,7 @@ const CameraScreen = () => {
 			}
 		}
 
- 		if (previewUri) {
+		if (previewUri) {
 			try {
 				await deleteFile(previewUri);
 				console.log('File deleted successfully:', previewUri);
@@ -462,7 +469,7 @@ const CameraScreen = () => {
 			}
 		}
 
- 		setPreviewUri(null);
+		setPreviewUri(null);
 		setPreviewType(null);
 		setRecordingTime(0);
 		lastVideoUriRef.current = null;
@@ -486,30 +493,7 @@ const CameraScreen = () => {
 		}
 	}, [flash]);
 
-	if (!permission?.granted) {
-		return (
-			<View style={styles.permissionContainer}>
-				<View style={styles.permissionContent}>
-					<Camera size={48} color="white" style={styles.permissionIcon} />
-					<Text style={styles.permissionTitle}>
-						{t("camera.permissionTitle") || "Camera Access Required"}
-					</Text>
-					<Text style={styles.permissionMessage}>
-						{t("camera.permissionMessage") ||
-							"This app needs camera access to take pictures and videos. Please enable it in settings."}
-					</Text>
-					<TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
-						<Text style={styles.permissionButtonText}>
-							{t("camera.grantPermission") || "Grant Permission"}
-						</Text>
-					</TouchableOpacity>
-					<TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-						<Text style={styles.backButtonText}>{t("camera.back") || "Go Back"}</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
-		);
-	}
+
 
 	return (
 		<View style={styles.container} ref={containerRef}>
@@ -668,16 +652,18 @@ const CameraScreen = () => {
 								<TouchableOpacity
 									onPress={handleShutter}
 									disabled={
-										(isCameraLoading && mode === "picture") ||
+										!cameraReady || // <-- Disable if camera is not ready
+										(mode === "picture" && isCameraLoading) ||
 										(mode === "video" && isRecording && !canStopRecording())
 									}
 									style={[
 										styles.shutterButton,
 										isRecording && styles.shutterButtonRecording,
-										((isCameraLoading && mode === "picture") ||
-											(mode === "video" &&
-												isRecording &&
-												!canStopRecording())) && { opacity: 0.5 },
+										(
+											!cameraReady || // <-- Apply opacity if camera not ready
+											(mode === "picture" && isCameraLoading) ||
+											(mode === "video" && isRecording && !canStopRecording())
+										) && { opacity: 0.5 },
 									]}
 								>
 									<View
@@ -686,7 +672,9 @@ const CameraScreen = () => {
 											isRecording && styles.shutterInnerRecording,
 										]}
 									>
-										{isCameraLoading && mode === "picture" ? (
+										{!cameraReady ? (
+											<Loader size={28} color="white" />
+										) : isCameraLoading && mode === "picture" ? (
 											<Loader size={28} color="white" />
 										) : mode === "picture" ? (
 											<Camera size={28} color="white" />
@@ -697,6 +685,7 @@ const CameraScreen = () => {
 										)}
 									</View>
 								</TouchableOpacity>
+
 								<View style={styles.settingsColumn}>
 									<TouchableOpacity
 										onPress={toggleFlash}
