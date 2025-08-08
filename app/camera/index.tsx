@@ -343,7 +343,7 @@ const CameraScreen = () => {
 
 		if (currentModeRef.current === "picture") {
 			try {
-
+			
 				try {
 					player.play();
 				} catch (error) {
@@ -381,7 +381,7 @@ const CameraScreen = () => {
 				const now = Date.now();
 				if (recordingStartTime && now - recordingStartTime < 1000) {
 					setIsCameraLoading(false);
-					console.log("reached here")
+									console.log("reached here")
 
 					return;
 				}
@@ -411,7 +411,7 @@ const CameraScreen = () => {
 					mirror: cameraType === "front", // Mirror front camera recordings
 				});
 				if (currentModeRef.current === "video" && video) {
-					console.log("CurrentModeRef:", currentModeRef); // Check if it's undefined/null
+ 				console.log("CurrentModeRef:", currentModeRef); // Check if it's undefined/null
 					const savedUri = await saveVideoToGallery(video.uri);
 					const finalUri = savedUri.startsWith("file://")
 						? savedUri
@@ -493,7 +493,30 @@ const CameraScreen = () => {
 		}
 	}, [flash]);
 
-
+	if (!permission?.granted) {
+		return (
+			<View style={styles.permissionContainer}>
+				<View style={styles.permissionContent}>
+					<Camera size={48} color="white" style={styles.permissionIcon} />
+					<Text style={styles.permissionTitle}>
+						{t("camera.permissionTitle") || "Camera Access Required"}
+					</Text>
+					<Text style={styles.permissionMessage}>
+						{t("camera.permissionMessage") ||
+							"This app needs camera access to take pictures and videos. Please enable it in settings."}
+					</Text>
+					<TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
+						<Text style={styles.permissionButtonText}>
+							{t("camera.grantPermission") || "Grant Permission"}
+						</Text>
+					</TouchableOpacity>
+					<TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+						<Text style={styles.backButtonText}>{t("camera.back") || "Go Back"}</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		);
+	}
 
 	return (
 		<View style={styles.container} ref={containerRef}>
@@ -652,18 +675,16 @@ const CameraScreen = () => {
 								<TouchableOpacity
 									onPress={handleShutter}
 									disabled={
-										!cameraReady || // <-- Disable if camera is not ready
-										(mode === "picture" && isCameraLoading) ||
+										(isCameraLoading && mode === "picture") ||
 										(mode === "video" && isRecording && !canStopRecording())
 									}
 									style={[
 										styles.shutterButton,
 										isRecording && styles.shutterButtonRecording,
-										(
-											!cameraReady || // <-- Apply opacity if camera not ready
-											(mode === "picture" && isCameraLoading) ||
-											(mode === "video" && isRecording && !canStopRecording())
-										) && { opacity: 0.5 },
+										((isCameraLoading && mode === "picture") ||
+											(mode === "video" &&
+												isRecording &&
+												!canStopRecording())) && { opacity: 0.5 },
 									]}
 								>
 									<View
@@ -672,9 +693,7 @@ const CameraScreen = () => {
 											isRecording && styles.shutterInnerRecording,
 										]}
 									>
-										{!cameraReady ? (
-											<Loader size={28} color="white" />
-										) : isCameraLoading && mode === "picture" ? (
+										{isCameraLoading && mode === "picture" ? (
 											<Loader size={28} color="white" />
 										) : mode === "picture" ? (
 											<Camera size={28} color="white" />
@@ -685,7 +704,6 @@ const CameraScreen = () => {
 										)}
 									</View>
 								</TouchableOpacity>
-
 								<View style={styles.settingsColumn}>
 									<TouchableOpacity
 										onPress={toggleFlash}
