@@ -1,6 +1,7 @@
-import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const CameraEntry = () => {
   const router = useRouter();
@@ -8,10 +9,27 @@ const CameraEntry = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
-  console.log('Camera mediaPath1:', path, type, size);
+  console.log("Camera mediaPath1:", path, type, size);
+
+  const [imageResolution, setImageResolution] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (path) {
+      Image.getSize(
+        String(path),
+        (width, height) => setImageResolution({ width, height }),
+        () => setImageResolution(null)
+      );
+    } else {
+      setImageResolution(null);
+    }
+  }, [path, type]);
 
   const handleOpenCamera = async () => {
-    console.log('opening camera')
+    console.log("opening camera");
     // Check camera permission first
     if (!permission?.granted) {
       const cameraResult = await requestPermission();
@@ -29,7 +47,7 @@ const CameraEntry = () => {
     }
 
     // Both permissions granted, navigate to camera
-    router.push('/camera');
+    router.push("/camera");
   };
 
   return (
@@ -41,7 +59,13 @@ const CameraEntry = () => {
           <Text style={styles.pathLabel}>File Type:</Text>
           <Text style={styles.pathText}>{type}</Text>
           <Text style={styles.pathLabel}>File Size:</Text>
-          <Text style={styles.pathText}>{(Number(size) / (1024 * 1024)).toFixed(2)} MB</Text>
+          <Text style={styles.pathText}>
+            {(Number(size) / (1024 * 1024)).toFixed(2)} MB
+          </Text>
+          <Text style={styles.pathLabel}>Resolution:</Text>
+          <Text style={styles.pathText}>
+            {imageResolution?.width} * {imageResolution?.height}
+          </Text>
         </View>
       )}
 
@@ -53,13 +77,28 @@ const CameraEntry = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  title: { fontSize: 24, marginBottom: 20, color: 'white' },
-  button: { backgroundColor: '#2196F3', padding: 15, borderRadius: 8, marginTop: 30 },
-  buttonText: { color: 'white', fontSize: 16 },
-  pathBox: { marginTop: 20, backgroundColor: '#1e1e1e', padding: 10, borderRadius: 8 },
-  pathLabel: { color: '#ccc', fontSize: 14, marginBottom: 5 },
-  pathText: { color: 'white', fontSize: 12, maxWidth: 300 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  title: { fontSize: 24, marginBottom: 20, color: "white" },
+  button: {
+    backgroundColor: "#2196F3",
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 30,
+  },
+  buttonText: { color: "white", fontSize: 16 },
+  pathBox: {
+    marginTop: 20,
+    backgroundColor: "#1e1e1e",
+    padding: 10,
+    borderRadius: 8,
+  },
+  pathLabel: { color: "#ccc", fontSize: 14, marginBottom: 5 },
+  pathText: { color: "white", fontSize: 12, maxWidth: 300 },
 });
 
 export default CameraEntry;
