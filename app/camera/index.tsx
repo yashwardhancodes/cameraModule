@@ -45,8 +45,7 @@ type VideoQuality = '480p' | '720p' | '1080p' | '2160p';
 
 
 type ImageQualityOption = {
-	label: string;
-	value: string;
+	 
 	maxSize: string;
 	quality: number;
 	description: string;
@@ -109,8 +108,7 @@ const CameraScreen = () => {
 
 	const [imageQualityOptions, setImageQualityOptions] = useState<ImageQualityOption[]>([]);
 	const [selectedQuality, setSelectedQuality] = useState<ImageQualityOption>({
-		label: 'Medium (Recommended)',
-		value: 'medium',
+		 
 		maxSize: '960x720',
 		quality: 0.6,
 		description: '960x720 resolution, 60% quality – good balance',
@@ -578,12 +576,12 @@ const CameraScreen = () => {
 									{(mode === 'picture' ? imageQualityOptions : videoQualityOptions).map((option) => {
 										const isSelected =
 											mode === 'picture'
-												? selectedQuality.value === option.value
-												: selectedVideoQuality.value === option.value;
+												? selectedQuality?.maxSize === (option as ImageQualityOption).maxSize
+												: selectedVideoQuality?.value === (option as VideoQualityOption).value; // Adjust for video if needed
 
 										return (
 											<TouchableOpacity
-												key={option.value}
+												key={(option as ImageQualityOption).maxSize|| (option as VideoQualityOption).value} // Use maxSize for images, value for videos
 												onPress={() => {
 													if (mode === 'picture') {
 														setSelectedQuality(option as ImageQualityOption);
@@ -599,7 +597,7 @@ const CameraScreen = () => {
 													<Text
 														style={[styles.qualityLabel, isSelected && styles.qualityLabelSelected]}
 													>
-														{option.label}
+														{mode === 'picture' ? (option as ImageQualityOption).maxSize : (option as ImageQualityOption).maxSize} {/* Use maxSize for images */}
 													</Text>
 													<Text
 														style={[

@@ -17,8 +17,7 @@ const CameraEntry = () => {
     height: number;
   } | null>(null);
 
-  // Get app version from expo-constants
-  const appVersion =   Constants.expoConfig?.version || "1.0.0";
+   const appVersion =   Constants.expoConfig?.version || "1.0.0";
 
   useEffect(() => {
     if (path) {
