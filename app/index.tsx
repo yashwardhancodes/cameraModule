@@ -1,4 +1,5 @@
 import { useCameraPermissions, useMicrophonePermissions } from "expo-camera";
+import Constants from "expo-constants";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -16,6 +17,9 @@ const CameraEntry = () => {
     height: number;
   } | null>(null);
 
+  // Get app version from expo-constants
+  const appVersion =   Constants.expoConfig?.version || "1.0.0";
+
   useEffect(() => {
     if (path) {
       Image.getSize(
@@ -30,28 +34,28 @@ const CameraEntry = () => {
 
   const handleOpenCamera = async () => {
     console.log("opening camera");
-    // Check camera permission first
     if (!permission?.granted) {
       const cameraResult = await requestPermission();
       if (!cameraResult.granted) {
-        return; // Exit if camera permission denied
+        return;
       }
     }
 
-    // Check microphone permission
     if (!micPermission?.granted) {
       const micResult = await requestMicPermission();
       if (!micResult.granted) {
-        return; // Exit if microphone permission denied
+        return;
       }
     }
 
-    // Both permissions granted, navigate to camera
     router.push("/camera");
   };
 
   return (
     <View style={styles.container}>
+      {/* Add version text at the top */}
+      <Text style={styles.versionText}>App Version: {appVersion}</Text>
+
       {path && (
         <View style={styles.pathBox}>
           <Text style={styles.pathLabel}>File Path:</Text>
@@ -82,6 +86,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+  },
+  versionText: {
+    position: 'absolute',
+    top: Constants.statusBarHeight + 20, // Below status bar
+    right: 20,
+    color: '#888',
+    fontSize: 12,
   },
   title: { fontSize: 24, marginBottom: 20, color: "white" },
   button: {
